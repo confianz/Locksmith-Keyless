@@ -14,12 +14,12 @@ The module that manages the order generated via Channel Advisor
     'website': 'https://www.confianzit.com',
     'depends': ['sale','sale_margin'],
     'data': [
+        'views/menu.xml',
         'views/edi_config_view.xml',
         'views/sale_order_view.xml',
         'views/partner_view.xml',
         'views/edi_log_view.xml',
         'views/product_view.xml',
-        'views/menu.xml',
         'views/connector_views.xml',
         "data/order_import_cron.xml",
         'security/ir.model.access.csv',
