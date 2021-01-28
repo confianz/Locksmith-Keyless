@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+   <data>
+
+
+        <record id="res_partner_view_edi_settings" model="ir.ui.view">
+            <field name="name">res.partner.edi</field>
+            <field name="model">res.partner</field>
+            <field name="inherit_id" ref="base.view_partner_form" />
+            <field name="arch" type="xml">
+                <group name ='sale' position="inside">
+                    <field name ='edi_partner'/>
+                     <field name ='edi_order'/>
+                    <field name ='edi_ack'/>
+                     <field name ='edi_inv'/>
+                     <field name ='edi_ship'/>
+                    <field name ='edi_partner_id'/>
+                </group>
+                <xpath expr="//page[2]" position = "before">
+            <page name="channel_adv_info" string="Channel Advisor Info">
+            <group>
+               <field name="trading_partner_code"/>
+               <field name="receiver_unique_code"/>
+               <field name="reciever_company_name"/>
+               <field name="vendor_number"/>
+             </group>
+            </page>
+        </xpath>
+
+               
+            </field>
+        </record>
+
+   </data>
+</odoo>

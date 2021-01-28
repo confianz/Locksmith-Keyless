@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+
+
+
+        <record model="ir.ui.view" id="channel_adv_sale_order">
+            <field name="name">channel_adv.sale.order</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_order_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name ='date_order']" position="after">
+                   <field name="chnl_adv_order_id" />
+                    <field name="item_sale_source" />
+                </xpath>
+                <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
+                    <field name="margin_percent" string="Margin%"/>
+                </xpath>
+            </field>
+        </record>
+
+
+
+
+        <record model="ir.ui.view" id="channel_adv_sale_order_order_line">
+        <field name="name">sale.order.line.margin.view.form</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="after">
+                <field name="margin_percent" string="Margin%" groups="base.group_user"/>
+            </xpath>
+        </field>
+    </record>
+
+
+    </data>
+
+
+</odoo>

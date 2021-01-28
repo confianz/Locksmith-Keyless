@@ -1,0 +1,63 @@
+# -*- coding: utf-8 -*-
+
+from odoo import api, fields, models, _
+# from ftplib import FTP
+# from StringIO import StringIO
+from xml.etree.ElementTree import Element, SubElement
+from xml.etree import ElementTree
+from xml.dom import minidom
+import datetime
+
+
+class SaleOrder(models.Model):
+    _inherit = "sale.order"
+    # channel_adv_order_ids = fields.One2many('sps.order', 'sale_id', string='Channel advisor Order')
+    chnl_adv_order_id = fields.Char('OrderID')
+    item_sale_source = fields.Char('ItemSaleSource')
+    is_edi_order = fields.Boolean(string='EDI Sales Order', copy=False)
+    margin_percent = fields.Float('Margin%', compute='_product_margin_percent', store=True)
+
+    @api.depends('order_line.margin', 'order_line.price_subtotal')
+    def _product_margin_percent(self):
+        if not all(self._ids):
+            for order in self:
+                order.margin_percent = sum(order.order_line.filtered(lambda r: r.state != 'cancel').mapped('margin'))/sum(order.order_line.filtered(lambda r: r.state != 'cancel').mapped('price_subtotal'))*100
+
+
+
+
+
+
+
+
+SaleOrder()
+
+
+class SaleOrderLine(models.Model):
+    _inherit = "sale.order.line"
+
+    margin = fields.Float(compute='_product_margin', digits='Product Price', store=True)
+    margin_percent = fields.Float('Margin%', compute='_product_margin_percent', store=True)
+
+    @api.depends('product_id', 'purchase_price', 'product_uom_qty', 'price_unit', 'price_subtotal')
+    def _product_margin(self):
+        for line in self:
+            currency = line.order_id.pricelist_id.currency_id
+            price = line.purchase_price
+            margin = line.price_subtotal - (price * line.product_uom_qty)
+            line.margin = currency.round(margin) if currency else margin
+
+    @api.depends('product_id', 'purchase_price', 'product_uom_qty', 'price_unit', 'price_subtotal')
+    def _product_margin_percent(self):
+        for line in self:
+            price = line.purchase_price
+            margin = line.price_subtotal - (price * line.product_uom_qty)
+            if line.price_subtotal:
+                line. margin_percent = margin/line.price_subtotal *100
+
+
+SaleOrderLine()
+
+
+
+        
