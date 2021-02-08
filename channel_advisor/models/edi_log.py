@@ -300,7 +300,7 @@ class TransactionLogger(models.Model):
 
     def _import_orders(self):
         cr = self.env.cr
-        connector = self.env['ca.connector'].search([],limit=1)
+        connector = self.env['ca.connector'].search([], limit=1)
         if not connector:
             return False
 

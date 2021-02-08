@@ -250,7 +250,7 @@ class ChannelAdvisorConnector(models.Model):
 
     def _cron_import_orders(self):
         apps = self.search([('state', '=', 'active'), ('auto_import_orders', '=', True)])
-        if app:
+        if apps:
             apps.env['transaction.log']._import_orders()
 
     def action_import_orders(self):
