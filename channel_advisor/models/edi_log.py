@@ -300,7 +300,10 @@ class TransactionLogger(models.Model):
 
     def _import_orders(self):
         cr = self.env.cr
-        connector =self.env['ca.connector'].search([],limit=1)
+        connector = self.env['ca.connector'].search([],limit=1)
+        if not connector:
+            return False
+
         date_filter = False
         if connector.orders_imported_date:
             date_filter = "CreatedDateUtc ge %s" %connector.orders_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
