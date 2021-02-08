@@ -14,6 +14,11 @@ The module that manages the order generated via Channel Advisor
     'website': 'https://www.confianzit.com',
     'depends': ['sale','sale_margin'],
     'data': [
+        'security/ir.model.access.csv',
+
+        'data/order_import_cron.xml',
+        'data/inventory_update_cron.xml',
+
         'views/menu.xml',
         'views/edi_config_view.xml',
         'views/sale_order_view.xml',
@@ -21,8 +26,9 @@ The module that manages the order generated via Channel Advisor
         'views/edi_log_view.xml',
         'views/product_view.xml',
         'views/connector_views.xml',
-        "data/order_import_cron.xml",
-        'security/ir.model.access.csv',
+        'views/ca_account_views.xml',
+        'views/res_company_view.xml',
+        'views/distribution_center_views.xml',
     ],
     'demo': [
 

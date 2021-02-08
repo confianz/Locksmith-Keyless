@@ -21,9 +21,7 @@ class TransactionLogger(models.Model):
         try:
 
             date_str1 = parser.parse(date_str)
-            print("date_str111111111111111111111111",date_str1)
             res = date_str1.strftime('%m/%d/%Y %H:%M:%S')
-            print (res)
             return res
 
         except:
@@ -35,7 +33,6 @@ class TransactionLogger(models.Model):
         res = {}
         ship_info = {}
         bill_info = {}
-        print(node)
         if node.get('ID'):
             res.update({'order_no': node.get('ID')})
         if node.get('SiteName') :
@@ -122,6 +119,22 @@ class TransactionLogger(models.Model):
                 'PhoneNumberDay': node.get('BillingDaytimePhone'),
             })
         res.update({'bill_info':bill_info})
+        if node.get('TotalShippingPrice'):
+            res.update({
+                'TotalShippingPrice': node.get('TotalShippingPrice'),
+            })
+        if node.get('TotalPrice'):
+            res.update({
+                'TotalPrice': node.get('TotalPrice'),
+            })
+        if node.get('SpecialInstructions'):
+            res.update({
+                'SpecialInstructions': node.get('SpecialInstructions'),
+            })
+        if node.get('PrivateNotes'):
+            res.update({
+                'PrivateNotes': node.get('PrivateNotes'),
+            })
         if node.get('Items'):
             for line_item in node.get('Items'):
                 if line_item.get('ID'):
@@ -132,7 +145,6 @@ class TransactionLogger(models.Model):
                     res['lines'][LineItemID].update({'SKU': line_item.get('Sku') or ''})
                     res['lines'][LineItemID].update({'Title': line_item.get('Title') or ''})
 
-        print ("res",res)
         return res
 
     def find_or_create_address(self, customer, address, address_type='delivery'):
@@ -193,19 +205,30 @@ class TransactionLogger(models.Model):
         :param line: dict
         :return: dict
         """
-        Product = self.env['customer.product.values'].search([
-            ('product_id.active', '=', True),
-            ('partner_id', '=', customer.id),
-            ('customer_sku', '=', line.get('SKU')),
-        ], limit=1).product_id
-        product = self.env['product.product'].search([('product_tmpl_id', '=', Product.id)])
+        # Product = self.env['customer.product.values'].search([
+        #     ('product_id.active', '=', True),
+        #     ('partner_id', '=', customer.id),
+        #     ('customer_sku', '=', line.get('SKU')),
+        # ], limit=1)
+        # if  Product:
+        #     product = self.env['product.product'].search([('product_tmpl_id', '=', Product.id)])
+        #
+        # else:
+        vals ={}
+        product = self.env['product.product'].search([('default_code', '=', line.get('SKU')), ('ca_product_id', '=', True)])
         if not product:
+            # product = self.env['product.product'].search(
+            #     [('default_code', '=', 'TEST001')])
             raise UserError('Product %s not in Product Master' % line.get('Title'))
+        if line.get('UnitPrice', '') != product.lst_price:
+            vals.update({"is_review":True})
+        else:
+            vals.update({"is_review": False})
         vals = {
 
             'product_id': product.id,
             'product_uom_qty': line.get('Quantity', 0),
-            'name': line.get('Title', 0) or Product.name,
+            'name': line.get('Title', 0) or product.name,
             # 'tax_id': [[6, 0, taxes]],
             'price_unit': line.get('UnitPrice', ''),
             'purchase_price':product.standard_price
@@ -222,12 +245,16 @@ class TransactionLogger(models.Model):
         """
         delivery_address = False
         invoice_address = False
+        is_review_lst =[]
+        is_review = False
         if data.get('SiteName'):
             site = data.get('SiteName')
-        Customer = self.env['res.partner'].search(
-            [('name', '=ilike', site)])
-        if not Customer:
-            raise UserError('Customer Not Found')
+            Customer = self.env['res.partner'].search(
+                [('name', '=ilike', site)])
+            if not Customer:
+                Customer = self.env['res.partner'].search(
+                    [('name', '=ilike', 'Checkout Direct')])
+                # raise UserError('Customer Not Found')
         if data.get('bill_info', '') :
             address = data.get('bill_info', '')
             invoice_address = self.find_or_create_address(Customer, address, 'invoice')
@@ -237,59 +264,78 @@ class TransactionLogger(models.Model):
         vals = {
             'partner_id':Customer.id,
             'is_edi_order': True,
+            'chnl_adv_order_id': data.get('order_no'),
             'client_order_ref':  data.get('mkt_order_no'),
-            'item_sale_source': data.get('ItemSaleSource'),
             'partner_shipping_id': delivery_address and delivery_address.id or Customer.id,  # 59,#
             'partner_invoice_id': invoice_address and invoice_address.id or Customer.id,  # 60,#
+            'special_instruction': data.get('SpecialInstructions'),
+            'private_note': data.get('PrivateNotes'),
+            'total_price': data.get('TotalPrice'),
             #     # 'carrier_id': carrier and carrier.id or False,
             #     # 'note': notes,
         }
+
         line_vals = []
         for line in data.get('lines'):
-            line_vals.append([0, 0, self.process_line_item(data.get('lines').get(line), Customer)])
-            # line_vals = [[0, 0, self.process_line_item(line_item, Customer)]]
-        vals.update({'order_line': line_vals})
-        SaleOrder = self.env['sale.order'].create(vals)
-        return SaleOrder
+            get_lines = self.process_line_item(data.get('lines').get(line), Customer)
+            is_review_lst.append(get_lines.pop('is_review', False))
+            line_vals.append((0, 0, get_lines))
+        pdt = self.env.user.company_id.shipping_cost_product_id
+        if pdt :
+            line_vals.append((0, 0, {'product_id': pdt.id,'price_unit': data.get('TotalShippingPrice', ''),'name':pdt.name}))
+
+        is_review = any(is_review_lst)
+        vals.update({'order_line':line_vals,'is_review':is_review})
+        SaleOrder = self.env ['sale.order']
+        saleorder = SaleOrder.search(
+            [('partner_id', '=', Customer.id), ('client_order_ref', '=', data.get('mkt_order_no')),('state', 'in', ['draft','sent'])])
+        if saleorder:
+            saleorder.write(vals)
+        else:
+            saleorder = SaleOrder.create(vals)
+            if Customer.name != 'Checkout Direct':
+                saleorder.action_confirm()
+        return saleorder
 
 
-    def xml_processing(self):
-        try:
+    def _import_orders(self):
+        cr = self.env.cr
+        connector =self.env['ca.connector'].search([],limit=1)
+        date_filter = False
+        if connector.orders_imported_date:
+            date_filter = "CreatedDateUtc ge %s" %connector.orders_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+        res = connector.call('import_orders', filter=date_filter)
+        for values in res.get('value', []):
+            try:
+                vals = self._get_values(values)
+                TransactionLog = self.create({
+                    'name': "Import Order",
+                })
+                error_message = ''
+                try:
+                    SaleOrder = TransactionLog.create_order(vals)
+                except Exception as e:
+                    error_message = e
+                    SaleOrder = False
+                if SaleOrder:
+                    TransactionLog.write(
+                        {'message': 'Order created succesfully', 'sale_id': SaleOrder.id, 'name': SaleOrder.name})
+                else:
+                    if error_message:
+                        TransactionLog.write({'message': error_message,'name': "Error in Order Import"})
+                cr.commit()
+            except Exception as e:
+                cr.rollback()
+        if res.get('@odata.nextLink') and connector:
+            connector.order_import_nextlink =res.get('@odata.nextLink', '').split('$skip=')[1]
+            connector.action_import_orders()
+        else:
+            connector.write({
+                'orders_import_nextlink': '',
+                'orders_imported_date': datetime.now(),
+            })
 
-            connector =self.env['ca.connector'].search([],limit=1)
-            if connector.auto_import_orders:
-                access_token = connector._access_token()
-                date = connector.orders_imported_date.date() or (datetime.datetime.today() - datetime.timedelta(days=1))
-                resource_url = "https://api.channeladvisor.com/v1/Orders/Items?access_token=%s&exported=false&$expand=Items&$filter=CreatedDateUtc ge %s"%(access_token, date)
-                if access_token:
-                    response = requests.get(resource_url)
-                    vals = json.loads(response.text)
-                    connector.orders_imported_date = datetime.now()
-                    for val in vals:
-                        values = self._get_values(val)
-                        TransactionLog = self.create({
-                            'name': "create order",
-                        })
-                        error_message = ''
-                        try:
-                            SaleOrder = TransactionLog.create_order(values)
-                        except Exception as e:
-                            error_message = e
-                            SaleOrder = False
-                        if SaleOrder and val.get('ID'):
-                            OrderID = val.get('ID')
-                            connector._access_token()
-                            response = requests.post('https://api.channeladvisor.com/v1/Orders(%s)/Export?access_token=%s'%(OrderID,connector.access_token))
-                            print("Status code: ", response.status_code)
 
-                            TransactionLog.write(
-                                {'message': 'Order created succesfully', 'sale_id': SaleOrder.id, 'name': SaleOrder.name})
-                        else:
-                            if error_message:
-                                TransactionLog.write({'message': error_message})
-        except Exception as e:
-            print (e)
-            pass
         return True
 
 

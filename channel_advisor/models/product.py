@@ -38,8 +38,9 @@ class ProductTemplate(models.Model):
 
     customer_product_value_ids = fields.One2many('customer.product.values', 'product_id', string= 'Customer Reference')
     product_customer_sku = fields.Char(related='customer_product_value_ids.customer_sku', string='Customer SKU')
-    ca_product_id = fields.Integer()
-    ca_profile_id = fields.Integer()
+    ca_product_id = fields.Char("Channel Advisor Product ID")
+    ca_profile_id = fields.Char("Channel Advisor Account ID")
+    ca_qty_updated_date = fields.Datetime(string="Qty Last Updated Date")
 
 
 class ProductProduct(models.Model):

@@ -11,23 +11,22 @@ import datetime
 
 class SaleOrder(models.Model):
     _inherit = "sale.order"
-    # channel_adv_order_ids = fields.One2many('sps.order', 'sale_id', string='Channel advisor Order')
+
     chnl_adv_order_id = fields.Char('OrderID')
-    item_sale_source = fields.Char('ItemSaleSource')
     is_edi_order = fields.Boolean(string='EDI Sales Order', copy=False)
+    is_review = fields.Boolean(string='Review', copy=False)
     margin_percent = fields.Float('Margin%', compute='_product_margin_percent', store=True)
+    special_instruction = fields.Html('SpecialInstructions')
+    private_note = fields.Html('PrivateNotes')
+    total_price = fields.Float('TotalPrice')
 
     @api.depends('order_line.margin', 'order_line.price_subtotal')
     def _product_margin_percent(self):
         if not all(self._ids):
             for order in self:
-                order.margin_percent = sum(order.order_line.filtered(lambda r: r.state != 'cancel').mapped('margin'))/sum(order.order_line.filtered(lambda r: r.state != 'cancel').mapped('price_subtotal'))*100
-
-
-
-
-
-
+                order.margin_percent = sum(
+                    order.order_line.filtered(lambda r: r.state != 'cancel').mapped('margin')) / sum(
+                    order.order_line.filtered(lambda r: r.state != 'cancel').mapped('price_subtotal')) * 100
 
 
 SaleOrder()
@@ -53,11 +52,11 @@ class SaleOrderLine(models.Model):
             price = line.purchase_price
             margin = line.price_subtotal - (price * line.product_uom_qty)
             if line.price_subtotal:
-                line. margin_percent = margin/line.price_subtotal *100
+                line.margin_percent = margin / line.price_subtotal * 100
 
 
 SaleOrderLine()
 
 
 
-        
+

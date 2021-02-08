@@ -6,9 +6,7 @@
         <field name="model">transaction.log</field>
         <field name="arch" type="xml">
             <tree create="false" edit="false" delete="false">
-                <field name="name" />
-                <button name="xml_processing" class="oe_highlight" string="Import" type="object"/>
-                <!--<field name="ftp_id" />-->
+                <field name="name" /><!--<field name="ftp_id" />-->
             </tree>
 
         </field>
