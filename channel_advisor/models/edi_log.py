@@ -37,6 +37,8 @@ class TransactionLogger(models.Model):
             res.update({'order_no': node.get('ID')})
         if node.get('SiteName') :
             res.update({'SiteName': node.get('SiteName')})
+        if node.get('SiteID') :
+            res.update({'SiteID': node.get('SiteID')})
         if  not res.get('lines'):
             res.update({'lines': {}})
         if node.get('SiteOrderID'):
@@ -144,6 +146,8 @@ class TransactionLogger(models.Model):
                     res['lines'][LineItemID].update({'Quantity': float(line_item.get('Quantity') or 0)})
                     res['lines'][LineItemID].update({'SKU': line_item.get('Sku') or ''})
                     res['lines'][LineItemID].update({'Title': line_item.get('Title') or ''})
+                    res['lines'][LineItemID].update({'ProductID': line_item.get('ProductID') or ''})
+
 
         return res
 
@@ -215,7 +219,9 @@ class TransactionLogger(models.Model):
         #
         # else:
         vals ={}
-        product = self.env['product.product'].search([('default_code', '=', line.get('SKU')), ('ca_product_id', '=', True)])
+        product = self.env['product.product'].search([('ca_product_id', '=', line.get('ProductID'))])
+        if not product:
+            product = self.env['product.product'].search([('default_code', '=', line.get('SKU')), ('ca_product_id', '=', False)])
         if not product:
             # product = self.env['product.product'].search(
             #     [('default_code', '=', 'TEST001')])
@@ -247,14 +253,14 @@ class TransactionLogger(models.Model):
         invoice_address = False
         is_review_lst =[]
         is_review = False
-        if data.get('SiteName'):
-            site = data.get('SiteName')
+        if data.get('SiteID'):
+            site = data.get('SiteID')
             Customer = self.env['res.partner'].search(
-                [('name', '=ilike', site)])
+                [('ca_site_id', '=', site)])
             if not Customer:
-                Customer = self.env['res.partner'].search(
-                    [('name', '=ilike', 'Checkout Direct')])
-                # raise UserError('Customer Not Found')
+                # Customer = self.env['res.partner'].search(
+                #     [('name', '=ilike', 'Checkout Direct')])
+                raise UserError('Customer Not Found')
         if data.get('bill_info', '') :
             address = data.get('bill_info', '')
             invoice_address = self.find_or_create_address(Customer, address, 'invoice')
@@ -300,7 +306,10 @@ class TransactionLogger(models.Model):
 
     def _import_orders(self):
         cr = self.env.cr
-        connector = self.env['ca.connector'].search([], limit=1)
+        if self.env.context.get('from_cron'):
+            connector = self.env['ca.connector'].search([('state', '=', 'active'), ('auto_import_orders', '=', True)], limit=1)
+        else:
+            connector = self.env['ca.connector'].search([('state', '=', 'active')], limit=1)
         if not connector:
             return False
 
@@ -331,7 +340,7 @@ class TransactionLogger(models.Model):
                 cr.rollback()
         if res.get('@odata.nextLink') and connector:
             connector.order_import_nextlink =res.get('@odata.nextLink', '').split('$skip=')[1]
-            connector.action_import_orders()
+            self._import_orders()
         else:
             connector.write({
                 'orders_import_nextlink': '',
