@@ -50,7 +50,6 @@ class ChannelAdvisorConnector(models.Model):
 
         :rtype               : dict
         :returns             : response data (res.json())
-
         """
         self.ensure_one()
         data = {}
@@ -176,7 +175,7 @@ class ChannelAdvisorConnector(models.Model):
             if app.products_imported_date:
                 date_filter = "CreateDateUtc ge %s" % app.products_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            select = ['ID', 'Sku', 'Title', 'ProfileID', 'Weight', 'Cost', 'RetailPrice', 'Classification']
+            select = ['ID', 'Sku', 'Title', 'ProfileID', 'Weight', 'Cost', 'RetailPrice', 'Classification', 'Description']
 
             res = app.call('import_products', filter=date_filter, select=select)
             for values in res.get('value', []):
@@ -185,6 +184,7 @@ class ChannelAdvisorConnector(models.Model):
                         'type': 'product',
                         'name': values.get('Title') or values.get('Sku'),
                         'default_code': values.get('Sku'),
+                        'description': values.get('Description'),
                         'ca_product_id': values.get('ID'),
                         'ca_profile_id': values.get('ProfileID'),
                         'weight': values.get('Weight') or 0,
