@@ -56,9 +56,12 @@ class ChannelAdvisorConnector(models.Model):
         data = {}
 
         if method == "import_products":
-            resource_url = self.base_url + "/v1/Products?access_token=%s" % self._access_token()
+            resource_url = self.base_url + "/v1/Products?access_token=%s&$expand=Images" % self._access_token()
             if kwargs.get('filter'):
                 resource_url += "&$filter=%s" % kwargs['filter']
+
+            if kwargs.get('select'):
+                resource_url += "&$select=%s" %  ','.join(kwargs['select'])
 
             if self.product_import_nextlink:
                 resource_url += "&$skip=%s" % self.product_import_nextlink
@@ -171,14 +174,16 @@ class ChannelAdvisorConnector(models.Model):
         for app in self:
             date_filter = False
             if app.products_imported_date:
-                date_filter = "CreateDateUtc ge %s" % self.products_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+                date_filter = "CreateDateUtc ge %s" % app.products_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            res = app.call('import_products', filter=date_filter)
+            select = ['ID', 'Sku', 'Title', 'ProfileID', 'Weight', 'Cost', 'RetailPrice', 'Classification']
+
+            res = app.call('import_products', filter=date_filter, select=select)
             for values in res.get('value', []):
                 try:
                     vals = {
                         'type': 'product',
-                        'name': values.get('Title'),
+                        'name': values.get('Title') or values.get('Sku'),
                         'default_code': values.get('Sku'),
                         'ca_product_id': values.get('ID'),
                         'ca_profile_id': values.get('ProfileID'),
@@ -187,9 +192,16 @@ class ChannelAdvisorConnector(models.Model):
                         'lst_price': values.get('RetailPrice') or 0,
                         'categ_id': categories.get(values.get('Classification'), 1),
                     }
-                    product = Product.search([('ca_product_id', '=', values.get('ID'))])
+                    product = Product.search([('ca_product_id', '=', values.get('ID')), ('ca_profile_id', '=', values.get('ProfileID'))])
                     if not product:
                         product = Product.search([('default_code', '=', values.get('Sku')), ('ca_product_id', '=', False)])
+
+                    if not product.image_1920 and values.get('Images'):
+                        img_url = values['Images'][0].get('Url')
+                        img_data = requests.get(img_url)
+                        if img_data.ok:
+                            vals['image_1920'] = base64.b64encode(img_data.content)
+
                     if product:
                         product.write(vals)
                     else:
