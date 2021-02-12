@@ -20,13 +20,12 @@ class SaleOrder(models.Model):
     private_note = fields.Html('PrivateNotes')
     total_price = fields.Float('TotalPrice')
 
-    @api.depends('order_line.margin', 'order_line.price_subtotal')
+    @api.depends('margin', 'amount_untaxed')
     def _product_margin_percent(self):
-        if not all(self._ids):
-            for order in self:
-                order.margin_percent = sum(
-                    order.order_line.filtered(lambda r: r.state != 'cancel').mapped('margin')) / sum(
-                    order.order_line.filtered(lambda r: r.state != 'cancel').mapped('price_subtotal')) * 100
+        for order in self:
+            if order.margin and order.amount_untaxed:
+                order.margin_percent = order.margin/order.amount_untaxed* 100
+
 
 
 SaleOrder()

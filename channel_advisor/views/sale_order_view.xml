@@ -18,6 +18,9 @@
                 <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
                     <field name="margin_percent" string="Margin%"/>
                 </xpath>
+                <!--<xpath expr="//field[@name='amount_total']" position="after">-->
+                    <!--<field name="margin_percent" string="Margin%"/>-->
+                <!--</xpath>-->
                 <xpath expr="//field[@name='client_order_ref']" position="after">
                     <field name="special_instruction" />
                     <field name="private_note" />
@@ -26,6 +29,16 @@
 
             </field>
         </record>
+        <record model="ir.ui.view" id="sale_margin_sale_order_inherit">
+        <field name="name">sale.order.margin.view.form</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale_margin.sale_margin_sale_order"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='margin']" position="replace">
+                    <field name="margin_percent" string="Margin%" groups="base.group_user"/>
+            </xpath>
+        </field>
+    </record>
 
 
 

@@ -41,6 +41,35 @@ class ProductTemplate(models.Model):
     ca_product_id = fields.Char("Channel Advisor Product ID")
     ca_profile_id = fields.Char("Channel Advisor Account ID")
     ca_qty_updated_date = fields.Datetime(string="Qty Last Updated Date")
+    ca_brand = fields.Char(string="Brand")
+    ca_mpn = fields.Char(string="MPN")
+    ca_product_type = fields.Selection([
+        ('Item', 'Standard'),
+        ('Child', 'Child'),
+        ('Parent', 'Parent'),
+        ('Bundle', 'Bundle'),
+    ], string="Product Type")
+    ca_parent_product_id = fields.Char(string="Parent Product ID")
+    ca_parent_id = fields.Many2one('product.template', string="Parent", compute="_compute_ca_parent_id")
+    is_ca_master_product = fields.Boolean(string="Master Product?", default=False)
+    ca_master_product_id = fields.Many2one('product.template', string="Master Product")
+    ca_mapped_product_ids = fields.One2many('product.template', 'ca_master_product_id', string="Mapped Products")
+    # ca_bundle_ids = fields.Many2many('product.template', 'ca_bundle_product_rel', 'product_id', 'bundle_id', string="Bundles")
+    # ca_bundle_product_ids = fields.Many2many('product.template', 'ca_bundle_product_rel', 'bundle_id', 'product_id', string="Components")
+
+    @api.depends('ca_parent_product_id')
+    def _compute_ca_parent_id(self):
+        for product in self:
+            if product.ca_parent_product_id:
+                parent = self.search([('ca_profile_id', '=', product.ca_profile_id), ('ca_product_id', '=', product.ca_parent_product_id)], limit=1)
+                product.ca_parent_id = parent.id
+            else:
+                product.ca_parent_id = False
+
+    @api.onchange('is_ca_master_product')
+    def _onchange_is_ca_master_product(self):
+        if self.is_ca_master_product:
+            self.ca_master_product_id = False
 
 
 class ProductProduct(models.Model):

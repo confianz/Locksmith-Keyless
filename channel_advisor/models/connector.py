@@ -166,16 +166,30 @@ class ChannelAdvisorConnector(models.Model):
                         'res_id': vals.get('ID', ''),
                     })
 
-    def _import_products(self):
+    def _import_products(self, run_by="auto"):
         cr = self.env.cr
         Product = self.env['product.product'].sudo()
         categories = {categ.name: categ.id for categ in self.env['product.category'].sudo().search([])}
         for app in self:
             date_filter = False
             if app.products_imported_date:
-                date_filter = "CreateDateUtc ge %s" % app.products_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+                date_filter = "UpdateDateUtc ge %s" % app.products_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            select = ['ID', 'Sku', 'Title', 'ProfileID', 'Weight', 'Cost', 'RetailPrice', 'Classification', 'Description']
+            select = [
+                'ID',
+                'Sku',
+                'Title',
+                'ProfileID',
+                'ProductType',
+                'MPN',
+                'Brand',
+                'Cost',
+                'Weight',
+                'RetailPrice',
+                'Description',
+                'Classification',
+                'ParentProductID',
+            ]
 
             res = app.call('import_products', filter=date_filter, select=select)
             for values in res.get('value', []):
@@ -191,6 +205,10 @@ class ChannelAdvisorConnector(models.Model):
                         'standard_price': values.get('Cost') or 0,
                         'lst_price': values.get('RetailPrice') or 0,
                         'categ_id': categories.get(values.get('Classification'), 1),
+                        'ca_brand': values.get('Brand') or '',
+                        'ca_mpn': values.get('MPN') or '',
+                        'ca_product_type': values.get('ProductType') or '',
+                        'ca_parent_product_id': values.get('ParentProductID') or '',
                     }
                     product = Product.search([('ca_product_id', '=', values.get('ID')), ('ca_profile_id', '=', values.get('ProfileID'))])
                     if not product:
@@ -213,7 +231,8 @@ class ChannelAdvisorConnector(models.Model):
             if res.get('@odata.nextLink'):
                 app.product_import_nextlink = res.get('@odata.nextLink', '').split('$skip=')[1]
                 cr.commit()
-                app._import_products()
+                if run_by == 'auto':
+                    app._import_products()
             else:
                 app.write({
                     'product_import_nextlink': '',
@@ -257,7 +276,7 @@ class ChannelAdvisorConnector(models.Model):
 
     def action_import_products(self):
         self.ensure_one()
-        self._import_products()
+        self._import_products(run_by="manual")
         return True
 
     def _cron_import_orders(self):

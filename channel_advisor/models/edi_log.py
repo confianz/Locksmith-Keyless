@@ -19,9 +19,8 @@ class TransactionLogger(models.Model):
     sale_id = fields.Many2one('sale.order', 'Sale Order')
     def convert_date_time(self, date_str):
         try:
-
-            date_str1 = parser.parse(date_str)
-            res = date_str1.strftime('%m/%d/%Y %H:%M:%S')
+            date_str1 = parser.parse(date_str).strftime("%Y-%m-%d %H:%M:%S")
+            res= datetime.strptime(date_str1,"%Y-%m-%d %H:%M:%S")
             return res
 
         except:
@@ -45,7 +44,7 @@ class TransactionLogger(models.Model):
             res.update({'mkt_order_no': node.get('SiteOrderID')})
         if node.get('CreatedDateUtc'):
             create_date = self.convert_date_time(node.get('CreatedDateUtc'))
-            res.update({'date_order ': create_date})
+            res.update({'date_order': create_date})
         if node.get('ShippingAddressLine1'):
             ship_info.update({
                 'address1':node.get('ShippingAddressLine1'),
@@ -124,6 +123,14 @@ class TransactionLogger(models.Model):
         if node.get('TotalShippingPrice'):
             res.update({
                 'TotalShippingPrice': node.get('TotalShippingPrice'),
+            })
+        if node.get('TotalTaxPrice'):
+            res.update({
+                'TotalTaxPrice': node.get('TotalTaxPrice'),
+            })
+        if node.get('TotalGiftOptionPrice'):
+            res.update({
+                'TotalGiftOptionPrice': node.get('TotalGiftOptionPrice'),
             })
         if node.get('TotalPrice'):
             res.update({
@@ -226,6 +233,9 @@ class TransactionLogger(models.Model):
             # product = self.env['product.product'].search(
             #     [('default_code', '=', 'TEST001')])
             raise UserError('Product %s not in Product Master' % line.get('Title'))
+        else:
+            if product.ca_master_product_id:
+                product = product.ca_master_product_id.product_variant_id
         if line.get('UnitPrice', '') != product.lst_price:
             vals.update({"is_review":True})
         else:
@@ -261,9 +271,9 @@ class TransactionLogger(models.Model):
                 # Customer = self.env['res.partner'].search(
                 #     [('name', '=ilike', 'Checkout Direct')])
                 raise UserError('Customer Not Found')
-        if data.get('bill_info', '') :
-            address = data.get('bill_info', '')
-            invoice_address = self.find_or_create_address(Customer, address, 'invoice')
+        # if data.get('bill_info', '') :
+        #     address = data.get('bill_info', '')
+        #     invoice_address = self.find_or_create_address(Customer, address, 'invoice')
         if data.get('ship_info', '') :
             address = data.get('ship_info', '')
             delivery_address = self.find_or_create_address(Customer, address, 'delivery')
@@ -273,23 +283,30 @@ class TransactionLogger(models.Model):
             'chnl_adv_order_id': data.get('order_no'),
             'client_order_ref':  data.get('mkt_order_no'),
             'partner_shipping_id': delivery_address and delivery_address.id or Customer.id,  # 59,#
-            'partner_invoice_id': invoice_address and invoice_address.id or Customer.id,  # 60,#
+            'partner_invoice_id': Customer.id,  # 60,#
             'special_instruction': data.get('SpecialInstructions'),
             'private_note': data.get('PrivateNotes'),
             'total_price': data.get('TotalPrice'),
+            'date_order':data.get('date_order'),
             #     # 'carrier_id': carrier and carrier.id or False,
             #     # 'note': notes,
         }
-
         line_vals = []
         for line in data.get('lines'):
             get_lines = self.process_line_item(data.get('lines').get(line), Customer)
             is_review_lst.append(get_lines.pop('is_review', False))
             line_vals.append((0, 0, get_lines))
         pdt = self.env.user.company_id.shipping_cost_product_id
-        if pdt :
-            line_vals.append((0, 0, {'product_id': pdt.id,'price_unit': data.get('TotalShippingPrice', ''),'name':pdt.name}))
-
+        tax = self.env.user.company_id.tax_product_id
+        gift = self.env.user.company_id.gift_product_id
+        if pdt and data.get('TotalShippingPrice', 0) :
+            line_vals.append((0, 0, {'product_id': pdt.id,'price_unit': data.get('TotalShippingPrice', 0),'name':pdt.name}))
+        if tax and data.get('TotalTaxPrice', 0) :
+            line_vals.append(
+                (0, 0, {'product_id': tax.id, 'price_unit': data.get('TotalTaxPrice', 0), 'name': tax.name}))
+        if gift and data.get('TotalGiftOptionPrice', 0) :
+            line_vals.append(
+                (0, 0, {'product_id': gift.id, 'price_unit': data.get('TotalGiftOptionPrice', 0), 'name': gift.name}))
         is_review = any(is_review_lst)
         vals.update({'order_line':line_vals,'is_review':is_review})
         SaleOrder = self.env ['sale.order']

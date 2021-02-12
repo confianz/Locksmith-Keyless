@@ -8,6 +8,8 @@ class ResCompany(models.Model):
 
 
     shipping_cost_product_id = fields.Many2one('product.product', string="Shipping Cost Product")
+    tax_product_id = fields.Many2one('product.product', string="Tax Product")
+    gift_product_id = fields.Many2one('product.product', string="Gift Product")
 
 
 

@@ -7,9 +7,11 @@
         <field name="inherit_id" ref="base.view_company_form"/>
         <field name="arch" type="xml">
             <notebook position="inside">
-                <page string="Shipping Product">
+                <page string="CA Default Product">
                     <group>
                         <field name="shipping_cost_product_id" domain="[('type', '=', 'service')]"/>
+                        <field name="tax_product_id" domain="[('type', '=', 'service')]"/>
+                        <field name="gift_product_id" domain="[('type', '=', 'service')]"/>
                     </group>
                 </page>
             </notebook>
