@@ -227,8 +227,8 @@ class TransactionLogger(models.Model):
         # else:
         vals ={}
         product = self.env['product.product'].search([('ca_product_id', '=', line.get('ProductID'))])
-        if not product:
-            product = self.env['product.product'].search([('default_code', '=', line.get('SKU')), ('ca_product_id', '=', False)])
+        # if not product:
+        #     product = self.env['product.product'].search([('default_code', '=', line.get('SKU')), ('ca_product_id', '=', False)])
         if not product:
             # product = self.env['product.product'].search(
             #     [('default_code', '=', 'TEST001')])

@@ -28,6 +28,7 @@ The module that manages the order generated via Channel Advisor
         'views/connector_views.xml',
         'views/ca_account_views.xml',
         'views/res_company_view.xml',
+        'views/purchase_view.xml',
         'views/distribution_center_views.xml',
         'report/report_saleorder.xml',
         'report/purchase_order_templates.xml',

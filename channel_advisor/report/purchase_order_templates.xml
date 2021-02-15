@@ -26,7 +26,7 @@
             <h2 t-if="o.state in ['purchase', 'done']">Purchase Order #<span t-field="o.name"/></h2>
             <h2 t-if="o.state == 'cancel'">Cancelled Purchase Order #<span t-field="o.name"/></h2>
 
-            <div id="informations" class="row mt32 mb32" style="font-size: 15px;">
+            <div id="informations" class="row mt32 mb32" style="font-size:15px;">
                 <div t-if="o.user_id" class="col-3 bm-2">
                     <strong>Purchase Representative:</strong>
                     <p t-field="o.user_id" class="m-0"/>
@@ -41,11 +41,11 @@
                 </div>
             </div>
 
-            <table class="table table-sm o_main_table" style="font-size: 15px;">
+            <table class="table table-sm o_main_table" style="font-size:15px;">
                 <thead>
                     <tr>
                         <th class="text-left">SKU</th>
-                        <!--<th class="text-left">Vendor SKU</th>-->
+                        <th class="text-left">Vendor SKU</th>
                         <th ><strong>Product</strong></th>
                         <th name="th_taxes"><strong>Taxes</strong></th>
                         <th name="th_date_req" class="text-center"><strong>Date Req.</strong></th>
@@ -65,9 +65,9 @@
                                 <td >
                                     <span t-field="line.product_id.default_code"/>
                                 </td>
-                                 <!--<td >-->
-                                    <!--<span t-field="line.product_id.default_code"/>-->
-                                <!--</td>-->
+                                 <td >
+                                    <span t-field="line.vendor_sku"/>
+                                </td>
                                 <td id="product">
                                     <span t-field="line.name"/>
                                 </td>
@@ -119,7 +119,7 @@
 
             <div id="total" class="row justify-content-end">
                 <div class="col-4">
-                    <table class="table table-sm" style="font-size: 15px;">
+                    <table class="table table-sm" style="font-size:15px;">
                         <tr class="border-black">
                             <td name="td_subtotal_label"><strong>Subtotal</strong></td>
                             <td class="text-right">

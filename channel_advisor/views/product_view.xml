@@ -39,7 +39,7 @@
                             <group>
                                 <field name="is_ca_master_product" attrs="{'invisible': [('ca_master_product_id', '!=', False)]}" />
                                 <field name="ca_master_product_id" domain="[('is_ca_master_product', '=', True)]"
-                                    attrs="{'invisible': [('is_ca_master_product', '=', True)]}" />
+                                    attrs="{'invisible': ['|', ('is_ca_master_product', '=', True), ('ca_product_type', 'in', ['Parent', 'Bundle'])]}" />
                             </group>
                         </group>
                         <group string="Components" attrs="{'invisible': [('is_ca_master_product', '=', False)]}">

@@ -7,3 +7,5 @@ from . import connector
 from . import ca_account
 from . import distribution_center
 from . import res_company
+from . import purchase
+
