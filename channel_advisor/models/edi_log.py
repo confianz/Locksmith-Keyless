@@ -270,7 +270,7 @@ class TransactionLogger(models.Model):
             if not Customer:
                 # Customer = self.env['res.partner'].search(
                 #     [('name', '=ilike', 'Checkout Direct')])
-                raise UserError('Customer Not Found')
+                raise UserError('Customer  %s not Found ' % data.get('SiteName'))
         # if data.get('bill_info', '') :
         #     address = data.get('bill_info', '')
         #     invoice_address = self.find_or_create_address(Customer, address, 'invoice')
@@ -280,6 +280,7 @@ class TransactionLogger(models.Model):
         vals = {
             'partner_id':Customer.id,
             'is_edi_order': True,
+            'name':data.get('order_no'),
             'chnl_adv_order_id': data.get('order_no'),
             'client_order_ref':  data.get('mkt_order_no'),
             'partner_shipping_id': delivery_address and delivery_address.id or Customer.id,  # 59,#
@@ -299,7 +300,7 @@ class TransactionLogger(models.Model):
         pdt = self.env.user.company_id.shipping_cost_product_id
         tax = self.env.user.company_id.tax_product_id
         gift = self.env.user.company_id.gift_product_id
-        if pdt and data.get('TotalShippingPrice', 0) :
+        if pdt :
             line_vals.append((0, 0, {'product_id': pdt.id,'price_unit': data.get('TotalShippingPrice', 0),'name':pdt.name}))
         if tax and data.get('TotalTaxPrice', 0) :
             line_vals.append(
@@ -311,13 +312,15 @@ class TransactionLogger(models.Model):
         vals.update({'order_line':line_vals,'is_review':is_review})
         SaleOrder = self.env ['sale.order']
         saleorder = SaleOrder.search(
-            [('partner_id', '=', Customer.id), ('client_order_ref', '=', data.get('mkt_order_no')),('state', 'in', ['draft','sent'])])
+            [('partner_id', '=', Customer.id), ('client_order_ref', '=', data.get('mkt_order_no')),('state', 'not in', ['cancel'])])
         if saleorder:
-            saleorder.write(vals)
+            if saleorder.state in  ['draft', 'sent']:
+                saleorder.write(vals)
         else:
             saleorder = SaleOrder.create(vals)
             if Customer.name != 'Checkout Direct':
                 saleorder.action_confirm()
+                saleorder.write({'date_order':data.get('date_order')})
         return saleorder
 
 
