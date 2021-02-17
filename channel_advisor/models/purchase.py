@@ -15,9 +15,8 @@ class PurchaseOrderLine(models.Model):
     @api.depends('product_id')
     def get_vendor_sku(self):
         for line in self:
-            if not line.product_id:
-                line.vendor_sku = ''
-            else:
+            line.vendor_sku = ''
+            if line.product_id:
                 for seller in line.product_id.seller_ids:
                     if line.order_id.partner_id == seller.name:
                         line.vendor_sku = seller.product_code

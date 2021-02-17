@@ -312,7 +312,7 @@ class TransactionLogger(models.Model):
         vals.update({'order_line':line_vals,'is_review':is_review})
         SaleOrder = self.env ['sale.order']
         saleorder = SaleOrder.search(
-            [('partner_id', '=', Customer.id), ('client_order_ref', '=', data.get('mkt_order_no')),('state', 'not in', ['cancel'])])
+            [('partner_id', '=', Customer.id), ('client_order_ref', '=', data.get('mkt_order_no')),('state', 'not in', ['cancel'])], limit=1)
         if saleorder:
             if saleorder.state in  ['draft', 'sent']:
                 saleorder.write(vals)
