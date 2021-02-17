@@ -156,7 +156,7 @@ class SaleOrder(models.Model):
         logging.error(response)
         shipment_data = response.get('shipments')
         if isinstance(shipment_data, dict):
-            orders += [shipment_data]
+            shipments += [shipment_data]
         shipments += shipment_data
         if shipments:
             self.update_shipstation_order(shipments, account)
@@ -391,23 +391,33 @@ class SaleOrder(models.Model):
     def update_shipstation_order(self, shipments, account):
         logging.error('------------------- SHIPMENTS -------------------')
         logging.error(shipments)
+        shipping_product = self.env.user.company_id.shipping_cost_product_id
         for shipment in shipments:
             try:
                 orderId = shipment.get('orderId')
                 if orderId:
-                    SaleOrder = self.search([('shipstation_order_id','=',orderId)], limit=1)
+                    SaleOrder = self.search([('shipstation_order_id','=', orderId)], limit=1)
+                    shipping_line = False
+                    if not SaleOrder:
+                        order_num = shipment.get('orderNumber', '')
+                        SaleOrder = self.search([('chnl_adv_order_id','=', order_num), ('state', '!=', 'cancel')], limit=1)
+                        if shipping_product:
+                            shipping_line = SaleOrder.order_line.filtered(lambda r: r.product_id.id == shipping_product.id)
                     if shipment.get('trackingNumber') and SaleOrder:
                         SaleOrder.write({
-                            'tracking_reference': shipment.get('trackingNumber'),
+                            'tracking_reference': shipment.get('trackingNumber', ''),
                             'shipped_from_shipstation': True,
                         })
+                        if shipping_line:
+                            shipping_line.write({'purchase_price': shipment.get('shipmentCost', 0.0)})
+
                         if SaleOrder.picking_ids:
                             for picking in SaleOrder.picking_ids:
                                 for move in picking.move_lines:
                                     for move_line in move.move_line_ids:
                                         move_line.qty_done = move_line.product_uom_qty
                                 picking.write({
-                                    'carrier_tracking_ref': shipment.get('trackingNumber'),
+                                    'carrier_tracking_ref': shipment.get('trackingNumber', ''),
                                     'shipped_from_shipstation': True,
                                 })
                                 picking.action_done()
@@ -424,7 +434,7 @@ class SaleOrder(models.Model):
                     self.env['shipstation.log'].register_log(
                         res_model='sale.order',
                         res_id=0,
-                        shipstation_id=ss_order_id or 0,
+                        shipstation_id=0,
                         operation='import',
                         message='Missing orderId : Order Update failed',
                         request=shipment,
@@ -434,7 +444,7 @@ class SaleOrder(models.Model):
                 self.env['shipstation.log'].register_log(
                     res_model='sale.order',
                     res_id=0,
-                    shipstation_id=ss_order_id or 0,
+                    shipstation_id=orderId or 0,
                     operation='import',
                     message=e,
                     request=shipment,

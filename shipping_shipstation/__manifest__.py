@@ -14,7 +14,7 @@
     'description': "Odoo Integration with Shipstation",
     'author': 'Confianz IT',
     'website': 'https://www.confianzit.com',
-    'depends':  ['shipping_core'],
+    'depends':  ['shipping_core', 'channel_advisor'],
     'data': [
         'security/ir.model.access.csv',
 
