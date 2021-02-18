@@ -10,13 +10,14 @@
             <field name="inherit_id" ref="sale.view_order_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//field[@name ='date_order']" position="after">
-                    <!--<field name="chnl_adv_order_id" />-->
+                    <field name="chnl_adv_order_id" />
                     <!--<field name="item_sale_source" />-->
                     <field name="is_edi_order" invisible="1"/>
                     <field name="is_review" invisible="1"/>
                 </xpath>
                 <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
                     <field name="margin_percent" string="Margin%"/>
+                    <field name="promotion_amt" string="Promotion"/>
                 </xpath>
                 <!--<xpath expr="//field[@name='amount_total']" position="after">-->
                     <!--<field name="margin_percent" string="Margin%"/>-->
@@ -50,6 +51,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="after">
                     <field name="margin_percent" string="Margin%" groups="base.group_user"/>
+                     <field name="promotion_amt" groups="base.group_user"/>
                 </xpath>
             </field>
         </record>

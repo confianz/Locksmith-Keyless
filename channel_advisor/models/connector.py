@@ -69,10 +69,9 @@ class ChannelAdvisorConnector(models.Model):
             data = res.json()
 
         elif method == "import_orders":
-            resource_url = self.base_url + "/v1/Orders?access_token=%s&$expand=Items" % self._access_token()
+            resource_url = self.base_url + "/v1/Orders?access_token=%s&$expand=Items($expand=promotions)" % self._access_token()
             if kwargs.get('filter'):
                 resource_url += "&$filter=%s" % kwargs['filter']
-
             if self.orders_import_nextlink:
                 resource_url += "&$skip=%s" % self.orders_import_nextlink
             res = requests.get(resource_url)

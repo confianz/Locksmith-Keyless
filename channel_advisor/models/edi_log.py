@@ -41,7 +41,7 @@ class TransactionLogger(models.Model):
         if  not res.get('lines'):
             res.update({'lines': {}})
         if node.get('SiteOrderID'):
-            res.update({'mkt_order_no': node.get('SiteOrderID')})
+            res.update({'SiteOrderID': node.get('SiteOrderID')})
         if node.get('CreatedDateUtc'):
             create_date = self.convert_date_time(node.get('CreatedDateUtc'))
             res.update({'date_order': create_date})
@@ -132,6 +132,18 @@ class TransactionLogger(models.Model):
             res.update({
                 'TotalGiftOptionPrice': node.get('TotalGiftOptionPrice'),
             })
+        if node.get('PromotionAmount'):
+            res.update({
+                'PromotionAmount': node.get('PromotionAmount'),
+            })
+        if node.get('AdditionalCostOrDiscount'):
+            res.update({
+                'AdditionalCostOrDiscount': node.get('AdditionalCostOrDiscount'),
+            })
+        if node.get('TotalInsurancePrice'):
+            res.update({
+                'TotalInsurancePrice': node.get('TotalInsurancePrice'),
+            })
         if node.get('TotalPrice'):
             res.update({
                 'TotalPrice': node.get('TotalPrice'),
@@ -154,6 +166,13 @@ class TransactionLogger(models.Model):
                     res['lines'][LineItemID].update({'SKU': line_item.get('Sku') or ''})
                     res['lines'][LineItemID].update({'Title': line_item.get('Title') or ''})
                     res['lines'][LineItemID].update({'ProductID': line_item.get('ProductID') or ''})
+                    promo_amt=0.0
+                    if line_item.get('Promotions'):
+                        for promo in line_item.get('Promotions'):
+                            promo_amt = promo_amt +(promo.get('Amount') or 0.0 )+(promo.get('UnitPrice') or 0.0)
+                        res['lines'][LineItemID].update({'promo_amt': promo_amt or '0'})
+
+
 
 
         return res
@@ -247,7 +266,8 @@ class TransactionLogger(models.Model):
             'name': line.get('Title', 0) or product.name,
             # 'tax_id': [[6, 0, taxes]],
             'price_unit': line.get('UnitPrice', ''),
-            'purchase_price':product.standard_price
+            'purchase_price':product.standard_price,
+            'promotion_amt': line.get('promo_amt', 0),
 
         }
         return vals
@@ -282,7 +302,7 @@ class TransactionLogger(models.Model):
             'is_edi_order': True,
             'name':data.get('order_no'),
             'chnl_adv_order_id': data.get('order_no'),
-            'client_order_ref':  data.get('mkt_order_no'),
+            'client_order_ref':  data.get('SiteOrderID'),
             'partner_shipping_id': delivery_address and delivery_address.id or Customer.id,  # 59,#
             'partner_invoice_id': Customer.id,  # 60,#
             'special_instruction': data.get('SpecialInstructions'),
@@ -300,6 +320,9 @@ class TransactionLogger(models.Model):
         pdt = self.env.user.company_id.shipping_cost_product_id
         tax = self.env.user.company_id.tax_product_id
         gift = self.env.user.company_id.gift_product_id
+        promo = self.env.user.company_id.promotion_product_id
+        addt_cost = self.env.user.company_id.addt_cost_product_id
+        insurance = self.env.user.company_id.insurance_product_id
         if pdt :
             line_vals.append((0, 0, {'product_id': pdt.id,'price_unit': data.get('TotalShippingPrice', 0),'name':pdt.name}))
         if tax and data.get('TotalTaxPrice', 0) :
@@ -308,11 +331,20 @@ class TransactionLogger(models.Model):
         if gift and data.get('TotalGiftOptionPrice', 0) :
             line_vals.append(
                 (0, 0, {'product_id': gift.id, 'price_unit': data.get('TotalGiftOptionPrice', 0), 'name': gift.name}))
+        if promo and data.get('PromotionAmount', 0):
+            line_vals.append(
+                (0, 0, {'product_id': promo.id, 'price_unit': data.get('PromotionAmount', 0), 'name': promo.name}))
+        if addt_cost and data.get('AdditionalCostOrDiscount', 0):
+            line_vals.append(
+                (0, 0, {'product_id': addt_cost.id, 'price_unit': data.get('AdditionalCostOrDiscount', 0), 'name': addt_cost.name}))
+        if insurance and data.get('TotalInsurancePrice', 0):
+            line_vals.append(
+                (0, 0, {'product_id': insurance.id, 'price_unit': data.get('TotalInsurancePrice', 0), 'name': insurance.name}))
         is_review = any(is_review_lst)
         vals.update({'order_line':line_vals,'is_review':is_review})
         SaleOrder = self.env ['sale.order']
         saleorder = SaleOrder.search(
-            [('partner_id', '=', Customer.id), ('client_order_ref', '=', data.get('mkt_order_no')),('state', 'not in', ['cancel'])], limit=1)
+            [('partner_id', '=', Customer.id), ('chnl_adv_order_id', '=', data.get('order_no')),('state', 'not in', ['cancel'])], limit=1)
         if saleorder:
             if saleorder.state in  ['draft', 'sent']:
                 saleorder.write(vals)
@@ -338,6 +370,7 @@ class TransactionLogger(models.Model):
             date_filter = "CreatedDateUtc ge %s" %connector.orders_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
         res = connector.call('import_orders', filter=date_filter)
         for values in res.get('value', []):
+
             try:
                 vals = self._get_values(values)
                 TransactionLog = self.create({
@@ -349,18 +382,14 @@ class TransactionLogger(models.Model):
                 except Exception as e:
                     error_message = e
                     SaleOrder = False
-                if SaleOrder:
-                    TransactionLog.write(
-                        {'message': 'Order created succesfully', 'sale_id': SaleOrder.id, 'name': SaleOrder.name})
-                else:
-                    if error_message:
-                        TransactionLog.write({'message': error_message,'name': "Error in Order Import"})
+                if error_message:
+                    TransactionLog.write({'message': error_message,'name': "Error in Order Import"})
                 cr.commit()
-            except Exception as e:
+            except Exception :
                 cr.rollback()
         if res.get('@odata.nextLink') and connector:
             connector.order_import_nextlink =res.get('@odata.nextLink', '').split('$skip=')[1]
-            self._import_orders()
+            # self._import_orders()
         else:
             connector.write({
                 'orders_import_nextlink': '',
