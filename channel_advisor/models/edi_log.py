@@ -344,7 +344,7 @@ class TransactionLogger(models.Model):
         vals.update({'order_line':line_vals,'is_review':is_review})
         SaleOrder = self.env ['sale.order']
         saleorder = SaleOrder.search(
-            [('partner_id', '=', Customer.id), ('chnl_adv_order_id', '=', data.get('order_no')),('state', 'not in', ['cancel'])], limit=1)
+            [('chnl_adv_order_id', '=', data.get('order_no')),('state', 'not in', ['cancel'])], limit=1)
         if saleorder:
             if saleorder.state in  ['draft', 'sent']:
                 saleorder.write(vals)
@@ -382,8 +382,12 @@ class TransactionLogger(models.Model):
                 except Exception as e:
                     error_message = e
                     SaleOrder = False
-                if error_message:
-                    TransactionLog.write({'message': error_message,'name': "Error in Order Import"})
+                if SaleOrder:
+                    TransactionLog.write(
+                        {'message': 'Order created succesfully', 'sale_id': SaleOrder.id, 'name': SaleOrder.name})
+                else:
+                    if error_message:
+                        TransactionLog.write({'message': error_message,'name': "Error in Order Import"})
                 cr.commit()
             except Exception :
                 cr.rollback()
