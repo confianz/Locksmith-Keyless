@@ -44,17 +44,16 @@ class SaleOrder(models.Model):
 
     @api.onchange('carrier_id')
     def onchange_carrier_id_ss(self):
-        for order in self:
-            if order.carrier_id:
-                order.shipstation_store_id = order.carrier_id.shipstation_store_id.id
-                if order.carrier_id.shipstation_service_id:
-                    order.shipstation_service_id = order.carrier_id.shipstation_service_id.id
-                if order.carrier_id.shipstation_carrier_id:
-                    order.shipstation_account_id = order.carrier_id.shipstation_carrier_id.id
-            else:
-                order.shipstation_store_id = False
-                order.shipstation_service_id = False
-                order.shipstation_account_id = False
+        if self.carrier_id:
+            self.shipstation_store_id = self.carrier_id.shipstation_store_id.id
+            if self.carrier_id.shipstation_service_id:
+                self.shipstation_service_id = self.carrier_id.shipstation_service_id.id
+            if self.carrier_id.shipstation_carrier_id:
+                self.shipstation_account_id = self.carrier_id.shipstation_carrier_id.account_id.id
+        else:
+            self.shipstation_store_id = False
+            self.shipstation_service_id = False
+            self.shipstation_account_id = False
 
     def _generate_shipping_data(self):
         res = super(SaleOrder, self)._generate_shipping_data()
