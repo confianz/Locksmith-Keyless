@@ -392,13 +392,16 @@ class TransactionLogger(models.Model):
             except Exception :
                 cr.rollback()
         if res.get('@odata.nextLink') and connector:
-            connector.order_import_nextlink =res.get('@odata.nextLink', '').split('$skip=')[1]
+            connector.write(
+                {'orders_import_nextlink': res.get('@odata.nextLink', '').split('$skip=')[1]})
+
             # self._import_orders()
         else:
             connector.write({
                 'orders_import_nextlink': '',
                 'orders_imported_date': datetime.now(),
             })
+        cr.commit()
 
 
         return True
