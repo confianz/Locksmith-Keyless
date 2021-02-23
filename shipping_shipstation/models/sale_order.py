@@ -391,6 +391,9 @@ class SaleOrder(models.Model):
         logging.error('------------------- SHIPMENTS -------------------')
         logging.error(shipments)
         shipping_product = self.env.user.company_id.shipping_cost_product_id
+        carriers = {carrier.code: carrier.id for carrier in self.env['shipstation.carrier'].search([])}
+        services = {service.code: service.id for service in self.env['shipstation.service'].search([])}
+        stores = {store.store_id: store.id for store in self.env['shipstation.store'].search([])}
         for shipment in shipments:
             try:
                 orderId = shipment.get('orderId')
@@ -399,14 +402,26 @@ class SaleOrder(models.Model):
                     shipping_line = False
                     if not SaleOrder:
                         order_num = shipment.get('orderNumber', '')
-                        SaleOrder = self.search([('chnl_adv_order_id','=', order_num), ('state', '!=', 'cancel')], limit=1)
+                        SaleOrder = self.search([('chnl_adv_order_id', '=', order_num), ('state', '!=', 'cancel')], limit=1)
                         if shipping_product:
                             shipping_line = SaleOrder.order_line.filtered(lambda r: r.product_id.id == shipping_product.id)
                     if shipment.get('trackingNumber') and SaleOrder:
-                        SaleOrder.write({
+                        vals = {
                             'tracking_reference': shipment.get('trackingNumber', ''),
                             'shipped_from_shipstation': True,
-                        })
+                        }
+                        if not SaleOrder.use_shipstation:
+                            vals.update({
+                                'shipstation_account_id' : account.id,
+                                'shipstation_carrier_id' : carriers.get(shipment.get('carrierCode', 'none'), False),
+                                'shipstation_service_id' : services.get(shipment.get('serviceCode', 'none'), False),
+                                'shipstation_store_id' : stores.get(shipment.get('advancedOptions', {}).get('storeId', 'none'), False),
+                                'shipstation_order_id': shipment.get('orderId', ''),
+                                'shipstation_order_key': shipment.get('orderKey', ''),
+                            })
+
+                        SaleOrder.write(vals)
+
                         if shipping_line:
                             shipping_line.write({'purchase_price': shipment.get('shipmentCost', 0.0)})
 
@@ -443,7 +458,7 @@ class SaleOrder(models.Model):
                 self.env['shipstation.log'].register_log(
                     res_model='sale.order',
                     res_id=0,
-                    shipstation_id=orderId or 0,
+                    shipstation_id=shipment.get('orderId') or 0,
                     operation='import',
                     message=e,
                     request=shipment,
