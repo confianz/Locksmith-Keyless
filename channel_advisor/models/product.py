@@ -51,11 +51,8 @@ class ProductTemplate(models.Model):
     ], string="Product Type")
     ca_parent_product_id = fields.Char(string="Parent Product ID")
     ca_parent_id = fields.Many2one('product.template', string="Parent", compute="_compute_ca_parent_id")
-    is_ca_master_product = fields.Boolean(string="Master Product?", default=False)
-    ca_master_product_id = fields.Many2one('product.template', string="Master Product")
-    ca_mapped_product_ids = fields.One2many('product.template', 'ca_master_product_id', string="Mapped Products")
-    # ca_bundle_ids = fields.Many2many('product.template', 'ca_bundle_product_rel', 'product_id', 'bundle_id', string="Bundles")
-    # ca_bundle_product_ids = fields.Many2many('product.template', 'ca_bundle_product_rel', 'bundle_id', 'product_id', string="Components")
+    ca_bundle_ids = fields.One2many('ca.product.bundle', 'product_tmpl_id', string="Bundles")
+    ca_bundle_product_ids = fields.One2many('ca.product.bundle', 'bundle_id', string="Components")
 
     @api.depends('ca_parent_product_id')
     def _compute_ca_parent_id(self):
@@ -66,10 +63,22 @@ class ProductTemplate(models.Model):
             else:
                 product.ca_parent_id = False
 
-    @api.onchange('is_ca_master_product')
-    def _onchange_is_ca_master_product(self):
-        if self.is_ca_master_product:
-            self.ca_master_product_id = False
+    def action_update_components(self):
+        self.ensure_one()
+        Product = self.env['product.product']
+        connector = self.env['ca.connector'].sudo().search([('ca_account_ids.account_id', '=', self.ca_profile_id)], limit=1)
+        if connector:
+            res = connector.call('retrieve_bundle_components', bundle_id=self.ca_product_id)
+            components = [(5, 0, 0)]
+            for vals in res.get('value', []):
+                product = Product.search([('ca_product_id', '=', vals.get('ComponentID')), ('ca_profile_id', '=', vals.get('ProfileID'))], limit=1)
+                if product:
+                    components.append((0, 0, {
+                        'product_id': product.id,
+                        'quantity': vals.get('Quantity', 0),
+                    }))
+            self.write({'ca_bundle_product_ids': components})
+        return True
 
 
 class ProductProduct(models.Model):
@@ -124,6 +133,16 @@ class ProductProduct(models.Model):
         for prefix, uri in xmlns_uris_dict.items():
             tree.attrib['xmlns:' + prefix] = uri
 
+
+class ProductBundle(models.Model):
+    _name = "ca.product.bundle"
+    _description = "Channel Advisor Product Bundle"
+
+    product_id = fields.Many2one('product.product', string="Component")
+    product_tmpl_id = fields.Many2one(related="product_id.product_tmpl_id", store=True)
+    product_type = fields.Selection(related="product_id.ca_product_type", string="Product type", readonly=True, store=False)
+    quantity = fields.Float(string="Quantity", default=1)
+    bundle_id = fields.Many2one('product.template', string="Bundle")
 
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:

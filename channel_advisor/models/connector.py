@@ -69,7 +69,7 @@ class ChannelAdvisorConnector(models.Model):
             data = res.json()
 
         elif method == "import_orders":
-            resource_url = self.base_url + "/v1/Orders?access_token=%s&$expand=Items($expand=promotions)" % self._access_token()
+            resource_url = self.base_url + "/v1/Orders?access_token=%s&$expand=Items($expand=Promotions),Fulfillments" % self._access_token()
             if kwargs.get('filter'):
                 resource_url += "&$filter=%s" % kwargs['filter']
             if self.orders_import_nextlink:
@@ -106,6 +106,12 @@ class ChannelAdvisorConnector(models.Model):
             resource_url = self.base_url + "/v1/DistributionCenters?access_token=%s" % self._access_token()
             res = requests.get(resource_url)
             data = res.json()
+
+        elif method == "retrieve_bundle_components":
+            if kwargs.get('bundle_id'):
+                resource_url = self.base_url + "/v1/Products(%s)/BundleComponents?access_token=%s" % (kwargs['bundle_id'], self._access_token())
+                res = requests.get(resource_url)
+                data = res.json()
 
         return data
 

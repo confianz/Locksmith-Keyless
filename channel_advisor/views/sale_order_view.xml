@@ -13,11 +13,12 @@
                     <field name="chnl_adv_order_id" />
                     <!--<field name="item_sale_source" />-->
                     <field name="is_edi_order" invisible="1"/>
+                    <field name="is_fba" invisible="1"/>
                     <field name="is_review" invisible="1"/>
                 </xpath>
                 <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
                     <field name="margin_percent" string="Margin%"/>
-                    <field name="promotion_amt" string="Promotion"/>
+                    <field name="promotion_code" invisible ="1"/>
                 </xpath>
                 <!--<xpath expr="//field[@name='amount_total']" position="after">-->
                     <!--<field name="margin_percent" string="Margin%"/>-->
@@ -51,7 +52,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='order_line']/form//field[@name='price_unit']" position="after">
                     <field name="margin_percent" string="Margin%" groups="base.group_user"/>
-                     <field name="promotion_amt" groups="base.group_user"/>
+                     <field name="promotion_code" groups="base.group_user"/>
                 </xpath>
             </field>
         </record>
@@ -67,6 +68,19 @@
         </record>
          <menuitem id="menu_sale_order_ca_order"
           name="CA Orders" action="action_sale_order_ca_order"
+          parent="sale.sale_order_menu"
+          sequence="2" />
+         <record id="action_sale_order_fba_order" model="ir.actions.act_window">
+            <field name="name">FBA Orders</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">sale.order</field>
+            <field name="view_mode">tree,kanban,form,calendar,pivot,graph</field>
+            <field name="search_view_id" ref="sale.sale_order_view_search_inherit_sale"/>
+            <field name="context">{'create':False, 'default_is_fba':True, 'create': False}</field>
+            <field name="domain">[('is_fba', '=', True)]</field>
+        </record>
+         <menuitem id="menu_sale_order_fba_order"
+          name="FBA Orders" action="action_sale_order_fba_order"
           parent="sale.sale_order_menu"
           sequence="2" />
 
