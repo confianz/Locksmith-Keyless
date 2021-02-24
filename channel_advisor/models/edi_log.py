@@ -193,10 +193,10 @@ class TransactionLogger(models.Model):
             tax = round(((line.get('TaxPrice')/line.get('UnitPrice', '')) *100),2)
             taxes = self.env['account.tax'].search([('amount', '=', tax), ('type_tax_use', '!=', 'purchase')])
             if not taxes:
-                vals= {'name':  str(tax),
+                values= {'name':  str(tax),
                        'amount':tax
                        }
-                taxes = self.env['account.tax'].create(vals)
+                taxes = self.env['account.tax'].create(values)
         vals = {
 
             'product_id': product.id,
@@ -273,10 +273,10 @@ class TransactionLogger(models.Model):
                 tax = round((( data.get('TotalShippingTaxPrice') /  data.get('TotalShippingPrice', '')) * 100), 2)
                 taxes = self.env['account.tax'].search([('amount', '=', tax), ('type_tax_use', '!=', 'purchase')])
                 if not taxes:
-                    vals = {'name': str(tax),
+                    values = {'name': str(tax),
                             'amount': tax
                             }
-                    taxes = self.env['account.tax'].create(vals)
+                    taxes = self.env['account.tax'].create(values)
             line_vals.append((0, 0, {'product_id': pdt.id,'price_unit': data.get('TotalShippingPrice', 0),'name':pdt.name,'tax_id': [[6, False, taxes.ids or []]],}))
         # if tax and data.get('TotalTaxPrice', 0) :
         #     line_vals.append(
