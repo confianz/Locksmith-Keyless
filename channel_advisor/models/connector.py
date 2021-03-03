@@ -257,14 +257,15 @@ class ChannelAdvisorConnector(models.Model):
             products = self.env['product.product'].search([
                 ('ca_product_id', '!=', False),
                 ('ca_profile_id', 'in', profile_ids),
+                ('ca_product_type', 'in', ['Item', 'Child']),
                 '|', ('ca_qty_updated_date', '=', False),
                 ('ca_qty_updated_date', '<', datetime.now() - timedelta(days=1)),
             ], limit=limit)
             for product in products:
                 try:
-                    vals = {'Value': {'UpdateType': 'InStock', 'Updates': []}}
+                    vals = {'Value': {'UpdateType': 'Absolute', 'Updates': []}}
                     for dist_center in dist_centers:
-                        qty_available = product.with_context(warehouse=dist_center.warehouse_id.id).qty_available
+                        qty_available = product.with_context(warehouse=dist_center.warehouse_id.id).free_qty
                         vals['Value']['Updates'].append({
                             'DistributionCenterID': int(dist_center.res_id),
                             'Quantity': int(qty_available),
