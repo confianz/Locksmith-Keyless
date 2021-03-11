@@ -230,10 +230,8 @@ class SaleOrder(models.Model):
             for line in order.order_line:
                 if line.product_id and line.product_id.type == 'service':
                     continue
-                if not (
-                            line.product_id.weight and line.product_id.depth and line.product_id.height and line.product_id.width):
-                    raise UserError(_(
-                        'Warning!\n The product %s does not have proper dimension or weight values.\nPlease consider adding them.' % line.product_id.name))
+                if not line.product_id.weight:
+                    raise UserError(_('The product %s does not have weight values' % line.product_id.name))
                 if line.product_id and line.product_id.depth > depth:
                     depth = line.product_id.depth
                 if line.product_id and line.product_id.height > height:
@@ -280,14 +278,7 @@ class SaleOrder(models.Model):
                             ('delivery_area', 'in', delivery_area),
                         ])
                         for method in delivery_carriers:
-                            if (method.weight > 0 and method.weight >= weight or method.weight < 0 and abs(
-                                    method.weight) <= weight) or \
-                                    (method.height > 0 and method.height >= height or method.height < 0 and abs(
-                                        method.height) <= height) or \
-                                    (method.width > 0 and method.width >= width or method.width < 0 and abs(
-                                        method.width) <= width) or \
-                                    (method.depth > 0 and method.depth >= depth or method.depth < 0 and abs(
-                                        method.depth) <= depth):
+                            if (method.weight > 0 and method.weight >= weight) or (method.weight < 0 and abs(method.weight) <= weight):
                                 if not checked_residential:
                                     residential = method.validate_residential_address(partner=order.partner_shipping_id)
                                     checked_residential = True
@@ -343,7 +334,7 @@ class SaleOrder(models.Model):
                         raise UserError(_('The Shipment supports Home Delivery '))
                     if order.carrier_id.name == 'TBD':
                         raise UserError(_("Invalid Data\nPlease Select a valid shipping type"))
-            elif not order.is_edi_order:
+            elif not order.is_edi_order and order.shipping_carrier_id:
                 raise UserError('Country or Zip Code missing in Delivery address')
         return super(SaleOrder, self).action_confirm()
 
