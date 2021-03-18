@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import json
 import base64
 import requests
 from datetime import datetime, timedelta
@@ -86,12 +87,28 @@ class ChannelAdvisorConnector(models.Model):
                 res = requests.post(resource_url, headers=header, json=kwargs['vals'])
                 # There is nothing to return
 
+        elif method == "batch_update_quantity":
+            batch_data = kwargs.get('batch_data', {})
+            data = []
+            for i, product_id in enumerate(batch_data):
+                data.append("--changeset\nContent-Type: application/http\nContent-Transfer-Encoding: binary\nContent-ID: %(content_id)d\n\nPOST %(resource_url)s HTTP/1.1\nContent-Type: application/json\n\n%(values)s" % {
+                    'content_id': i + 1,
+                    'resource_url': self.base_url + "/V1/Products(%s)/UpdateQuantity" % (product_id),
+                    'values': json.dumps(batch_data[product_id], indent=4),
+                })
+
+            if data:
+                header = {'Content-Type': 'multipart/mixed; boundary=changeset'}
+                request_url = self.base_url + "/v1/$batch?access_token=%s" % (self._access_token())
+                body = "--batch Content-Type: multipart/mixed; boundary=changeset\n%(data)s\n--changeset--\n--batch--" % {'data': '\n'.join(data)}
+                res = requests.post(request_url, headers=header, data=body)
+                # There is nothing to return
+
         elif method == "update_price":
             if kwargs.get('product_id') and kwargs.get('vals'):
                 header = {'Content-Type': 'application/json'}
                 resource_url = self.base_url + "/v1/Products(%s)?access_token=%s" % (kwargs['product_id'], self._access_token())
                 res = requests.put(resource_url, headers=header, json=kwargs['vals'])
-
                 # There is nothing to return
 
         elif method == "refresh_access_token":
@@ -183,12 +200,14 @@ class ChannelAdvisorConnector(models.Model):
 
     def _import_products(self, run_by="auto"):
         cr = self.env.cr
+        imported_date = datetime.now()
         Product = self.env['product.product'].sudo()
         categories = {categ.name: categ.id for categ in self.env['product.category'].sudo().search([])}
         for app in self:
             date_filter = False
             if app.products_imported_date:
-                date_filter = "UpdateDateUtc ge %s" % app.products_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+                last_imported_date = app.products_imported_date - timedelta(minutes=10)
+                date_filter = "UpdateDateUtc ge %s" % last_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
 
             select = [
                 'ID',
@@ -224,6 +243,7 @@ class ChannelAdvisorConnector(models.Model):
                         'ca_mpn': values.get('MPN') or '',
                         'ca_product_type': values.get('ProductType') or '',
                         'ca_parent_product_id': values.get('ParentProductID') or '',
+                        'is_kit': True if values.get('ProductType') == 'Bundle' else False,
                     }
                     product = Product.search([('ca_product_id', '=', values.get('ID')), ('ca_profile_id', '=', values.get('ProfileID'))])
                     if not product:
@@ -251,7 +271,7 @@ class ChannelAdvisorConnector(models.Model):
             else:
                 app.write({
                     'product_import_nextlink': '',
-                    'products_imported_date': datetime.now(),
+                    'products_imported_date': imported_date,
                 })
                 cr.commit()
 
@@ -275,7 +295,11 @@ class ChannelAdvisorConnector(models.Model):
                 try:
                     vals = {'Value': {'UpdateType': 'Absolute', 'Updates': []}}
                     for dist_center in dist_centers:
-                        qty_available = product.with_context(warehouse=dist_center.warehouse_id.id).free_qty
+                        if product.is_kit:
+                            qty_available = product.with_context(warehouse=dist_center.warehouse_id.id).kit_free_qty
+                        else:
+                            qty_available = product.with_context(warehouse=dist_center.warehouse_id.id).free_qty
+
                         vals['Value']['Updates'].append({
                             'DistributionCenterID': int(dist_center.res_id),
                             'Quantity': int(qty_available),
