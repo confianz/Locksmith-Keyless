@@ -85,6 +85,7 @@ class TransactionLogger(models.Model):
                     'PrivateNotes': node.get('PrivateNotes', ''),
                     'TotalGiftOptionTaxPrice': node.get('TotalGiftOptionTaxPrice', ''),
                     'TotalShippingTaxPrice': node.get('TotalShippingTaxPrice', ''),
+                    'Paymentstatus' : node.get('PaymentStatus', ''),
                     })
         if ship_info:
             res.update({'ship_info': ship_info})
@@ -167,6 +168,7 @@ class TransactionLogger(models.Model):
 
             del_addr = customer.create(vals)
         return del_addr
+
     def process_line_item(self, line, customer):
         """
         Process line item and return dict of values to create sale line
@@ -315,26 +317,25 @@ class TransactionLogger(models.Model):
         SaleOrder = self.env ['sale.order']
         saleorder = SaleOrder.search(
             [('chnl_adv_order_id', '=', data.get('order_no')),('state', 'not in', ['cancel'])], limit=1)
-        if saleorder:
-            if saleorder.state in  ['draft', 'sent']:
-                saleorder.write(vals)
-        else:
+
+        if not saleorder:
             saleorder = SaleOrder.create(vals)
-            if Customer.name != 'Checkout Direct':
-                saleorder.action_confirm()
-                saleorder.write({'date_order': data.get('date_order')})
-                if saleorder.is_fba:
-                    for pack in saleorder.picking_ids.move_line_ids:
-                        if pack.product_qty > 0:
-                            pack.write({'qty_done': pack.product_qty})
-                    saleorder.picking_ids.action_done()
+
+        if saleorder.state in  ['draft', 'sent'] and Customer.name != 'Checkout Direct' and data.get('Paymentstatus') == 'Cleared':
+            saleorder.action_confirm()
+            saleorder.write({'date_order': data.get('date_order')})
+            if saleorder.is_fba:
+                for pack in saleorder.picking_ids.move_line_ids:
+                    if pack.product_qty > 0:
+                        pack.write({'qty_done': pack.product_qty})
+                saleorder.picking_ids.action_done()
 
         return saleorder
 
 
     def _import_orders(self):
         cr = self.env.cr
-        imported_date = datetime.now()
+        imported_date = datetime.now() - timedelta(minutes=10)
         if self.env.context.get('from_cron'):
             connector = self.env['ca.connector'].search([('state', '=', 'active'), ('auto_import_orders', '=', True)], limit=1)
         else:
@@ -344,8 +345,8 @@ class TransactionLogger(models.Model):
 
         date_filter = False
         if connector.orders_imported_date:
-            last_imported_date = connector.orders_imported_date - timedelta(minutes=10)
-            date_filter = "CreatedDateUtc ge %s" % last_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+            last_imported_date = connector.orders_imported_date - timedelta(minutes=60)
+            date_filter = "CreatedDateUtc ge %s and CreatedDateUtc lt %s" % (last_imported_date.strftime("%Y-%m-%dT%H:%M:%SZ"), imported_date.strftime("%Y-%m-%dT%H:%M:%SZ"))
         res = connector.call('import_orders', filter=date_filter)
         center_dict = {center.res_id: center.warehouse_id.id for center in self.env['ca.distribution.center'].search([])}
         for values in res.get('value', []):
@@ -355,6 +356,12 @@ class TransactionLogger(models.Model):
                 try:
                     SaleOrder = self.create_order(vals,center_dict)
                     cr.commit()
+
+                    # Creating and Validating Invoice
+                    if SaleOrder.invoice_status == 'to invoice':
+                        invoices = SaleOrder._create_invoices(final=True)
+                        invoices.post()
+                        cr.commit()
                 except Exception as e:
                     cr.rollback()
                     error_message = e
@@ -383,6 +390,46 @@ class TransactionLogger(models.Model):
 
         return True
 
+    @api.model
+    def _cron_confirm_ca_order(self, limit=None):
+        connector = self.env['ca.connector'].sudo().search([('state', '=', 'active')], limit=1)
+        if not connector:
+            return False
+
+        cr = self.env.cr
+        SaleOrder = self.env ['sale.order'].sudo()
+        orders = SaleOrder.search([
+            ('is_edi_order', '=', True),
+            ('chnl_adv_order_id', '!=', False),
+            ('state', 'in', ['draft', 'sent']),
+        ], limit=limit)
+
+        for order in orders:
+            try:
+                res = connector.call('get_payment_status', order_id=order.chnl_adv_order_id) or {}
+                if res.get('PaymentStatus', 'pending') == 'Cleared':
+                    order.action_confirm()
+                    if res.get('CreatedDateUtc'):
+                        order_date = self.convert_date_time(res['CreatedDateUtc'])
+                        order.write({'date_order': order_date})
+
+                    if order.is_fba:
+                        for pack in order.picking_ids.move_line_ids:
+                            if pack.product_qty > 0:
+                                pack.write({'qty_done': pack.product_qty})
+                        order.picking_ids.action_done()
+
+                    cr.commit()
+
+                    if order.invoice_status == 'to invoice':
+                        invoices = order._create_invoices(final=True)
+                        invoices.post()
+                        cr.commit()
+
+            except Exception as e:
+                cr.rollback()
+
+        return True
 
 
-
+# vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:

@@ -140,6 +140,12 @@ class ChannelAdvisorConnector(models.Model):
                 res = requests.get(resource_url)
                 data = res.json()
 
+        elif method == "get_payment_status":
+            if kwargs.get('order_id'):
+                resource_url = self.base_url + "/v1/Orders(%s)?access_token=%s&$select=PaymentStatus,CreatedDateUtc" % (kwargs['order_id'], self._access_token())
+                res = requests.get(resource_url)
+                data = res.json()
+
         return data
 
     def _refresh_access_token(self):
@@ -345,6 +351,22 @@ class ChannelAdvisorConnector(models.Model):
     def action_reset(self):
         self.ensure_one()
         self.state = 'draft'
+
+    def action_update_quantity(self):
+        self.ensure_one()
+        UpdateQueue = self.env['ca.update.queue']
+
+        products = self.env['product.product'].search([('ca_product_type', 'in', ['Item', 'Child']), ('ca_product_id', '!=', False)])
+        queued_items = UpdateQueue.search([('update_type', '=', 'quantity')]).mapped('product_id')
+        products_to_update = products - queued_items
+
+        for product in products_to_update:
+            UpdateQueue.create({
+                'update_type': 'quantity',
+                'product_id': product.id,
+            })
+
+        return True
 
 
 # vim:expandtab:smartindent:tabstop=4:softtabstop=4:shiftwidth=4:

@@ -14,11 +14,35 @@ class StockPicking(models.Model):
     shipstation_exported = fields.Boolean(string="Exported to Shipstation", copy=False)
     shipstation_carrier_id = fields.Many2one('shipstation.carrier', string="ShipStation Carrier")
     shipstation_service_id = fields.Many2one('shipstation.service', string="ShipStation Service")
+    shipstation_package_id = fields.Many2one('shipstation.packages','Package', copy=False)
     shipstation_store_id = fields.Many2one('shipstation.store', string="ShipStation Store")
     shipstation_shipment_id = fields.Char(string="ShipStation Shipment ID", copy=False)
     shipped_from_shipstation = fields.Boolean(string="Shipped From Shipstation", copy=False)
     shipstation_order_key = fields.Char(string="Shipstation Order Key", copy=False)
     sscc_id = fields.Char(string="SSCC ID", copy=False)
+
+    @api.onchange('shipping_carrier_id')
+    def onchange_shipping_carrier_id_ss(self):
+        for order in self:
+            if order.shipping_carrier_id and order.shipping_carrier_id.shipstation_carrier_id:
+                order.shipstation_carrier_id = order.shipping_carrier_id.shipstation_carrier_id.id
+            else:
+                order.shipstation_carrier_id = False
+
+    @api.onchange('carrier_id')
+    def onchange_carrier_id_ss(self):
+        if self.carrier_id:
+            self.shipstation_store_id = self.carrier_id.shipstation_store_id.id
+            self.shipstation_package_id = self.carrier_id.shipstation_package_id.id
+            if self.carrier_id.shipstation_service_id:
+                self.shipstation_service_id = self.carrier_id.shipstation_service_id.id
+            if self.carrier_id.shipstation_carrier_id:
+                self.shipstation_account_id = self.carrier_id.shipstation_carrier_id.account_id.id
+        else:
+            self.shipstation_store_id = False
+            self.shipstation_service_id = False
+            self.shipstation_account_id = False
+            self.shipstation_package_id = False
 
     def visit_shipstation(self):
         """
@@ -60,6 +84,8 @@ class StockPicking(models.Model):
                 'shipstation_carrier_id': self.shipstation_carrier_id,
                 'shipstation_service_id': self.shipstation_service_id,
                 'shipstation_store_id': self.shipstation_store_id,
+                'shipstation_package_id': self.shipstation_package_id,
+                'shipstation_account_id' : self.shipstation_carrier_id.account_id,
             })
         return res
 
@@ -90,6 +116,7 @@ class StockPicking(models.Model):
                     "customerEmail": picking.partner_id.email,
                     "carrierCode": picking.shipstation_carrier_id.code,
                     "serviceCode": picking.shipstation_service_id.code,
+                    'packageCode': picking.shipstation_package_id.code or None,
                     "weight": {
                         "value": picking.weight,
                         "units": "pounds",
@@ -115,13 +142,13 @@ class StockPicking(models.Model):
                         "phone": picking.partner_id.phone,
                     },
                     "items": item_list,
-                    "advancedOptions" : {"storeId" : sale_order.shipstation_store_id.store_id},
+                    "advancedOptions" : {"storeId" : picking.shipstation_store_id.store_id},
                 }
 
                 if picking.backorder_id and picking.backorder_id.shipstation_order_id:
                     values.update({"advancedOptions" : {
                         'mergedOrSplit': True,
-                        'storeId' : sale_order.shipstation_store_id.store_id,
+                        'storeId' : picking.shipstation_store_id.store_id,
                         'parentId': int(picking.backorder_id.shipstation_order_id),
                     }})
 
@@ -190,7 +217,7 @@ class StockPicking(models.Model):
 
     def send_to_shipper(self):
         self.ensure_one()
-        if self.shipped_from_shipstation or self.is_shipstation_order:
+        if self.shipped_from_shipstation or self.is_shipstation_order or self.carrier_id.delivery_type == 'shipstation_ts':
             return True
         else:
             return super(StockPicking, self).send_to_shipper()
@@ -217,9 +244,19 @@ class StockPicking(models.Model):
         self.ensure_one()
         res = super(StockPicking, self).action_done()
         if self.state == 'done' and self.picking_type_id.code == 'outgoing':
-            if self.shipstation_order_id:
+            if (self.shipstation_order_id and self.is_shipstation_order) or (self.use_shipstation and self.is_shipstation_order):
                 shipment_values = self.prepare_shipstation_data(operation='update')
                 response = self.shipstation_store_id.account_id._send_request('orders/createorder', shipment_values, method="POST")
+                if response.get('orderId'):
+                    self.write({
+                        'shipstation_order_id': response.get('orderId'),
+                        'shipstation_exported': True,
+                        'shipstation_order_key': response.get('orderKey'),
+                    })
+                    self.sale_id.write({
+                        'shipstation_order_id': response.get('orderId'),
+                        'shipstation_order_key': response.get('orderKey'),
+                    })
             self.restore_from_hold()
         return res
 
@@ -244,6 +281,7 @@ class StockMove(models.Model):
                     'shipstation_order_key' : sale_order.shipstation_order_key,
                     'shipstation_carrier_id' : sale_order.shipstation_carrier_id.id,
                     'shipstation_service_id' : sale_order.shipstation_service_id.id,
+                    'shipstation_package_id' : sale_order.shipstation_package_id.id,
                 })
         return res
 
