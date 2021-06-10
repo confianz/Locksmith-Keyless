@@ -150,15 +150,6 @@ class ProductTemplate(models.Model):
 
         return res
 
-    def get_ca_attribute(self, attrib=None):
-        self.ensure_one()
-        value = ''
-        if attrib and self.description_sale:
-            attributes = self.description_sale.split('<br>')
-            vals = [attribute.split(':')[-1] for attribute in attributes if attrib in attribute]
-            value = vals and vals[0].strip() or ''
-        return value
-
 
 class ProductProduct(models.Model):
     _inherit = 'product.product'
@@ -256,15 +247,6 @@ class ProductProduct(models.Model):
                         vals = {'Cost': product.standard_price}
                         app.call('update_price', product_id=product.ca_product_id, vals=vals)
         return res
-
-    def get_ca_attribute(self, attrib=None):
-        self.ensure_one()
-        value = ''
-        if attrib and self.description_sale:
-            attributes = self.description_sale.split('<br>')
-            vals = [attribute.split(':')[-1] for attribute in attributes if attrib in attribute]
-            value = vals and vals[0].strip() or ''
-        return value
 
 
 class ProductBundle(models.Model):
