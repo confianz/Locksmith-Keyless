@@ -80,6 +80,12 @@ class ChannelAdvisorConnector(models.Model):
             res = requests.get(resource_url)
             data = res.json()
 
+        elif method == "retrieve_order":
+            if kwargs.get('order_id'):
+                resource_url = self.base_url + "/v1/Orders(%s)?access_token=%s&$expand=Items($expand=Promotions),Fulfillments" % (kwargs.get('order_id'), self._access_token())
+                res = requests.get(resource_url)
+                data = res.json()
+
         elif method == "update_quantity":
             if kwargs.get('product_id') and kwargs.get('vals'):
                 header = {'Content-Type': 'application/json'}
@@ -225,8 +231,10 @@ class ChannelAdvisorConnector(models.Model):
                 'Brand',
                 'Cost',
                 'Weight',
+                'Condition',
                 'RetailPrice',
                 'Description',
+                'Manufacturer',
                 'Classification',
                 'ParentProductID',
             ]
@@ -238,7 +246,7 @@ class ChannelAdvisorConnector(models.Model):
                         'type': 'product',
                         'name': values.get('Title') or values.get('Sku'),
                         'default_code': values.get('Sku'),
-                        'description': values.get('Description'),
+                        'description_sale': values.get('Description'),
                         'ca_product_id': values.get('ID'),
                         'ca_profile_id': values.get('ProfileID'),
                         'weight': values.get('Weight') or 0,
@@ -249,6 +257,8 @@ class ChannelAdvisorConnector(models.Model):
                         'ca_mpn': values.get('MPN') or '',
                         'ca_product_type': values.get('ProductType') or '',
                         'ca_parent_product_id': values.get('ParentProductID') or '',
+                        'ca_condition': values.get('Condition') or '',
+                        'ca_manufacturer': values.get('Manufacturer') or '',
                         'is_kit': True if values.get('ProductType') == 'Bundle' else False,
                     }
                     product = Product.search([('ca_product_id', '=', values.get('ID')), ('ca_profile_id', '=', values.get('ProfileID'))])

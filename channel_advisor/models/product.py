@@ -58,6 +58,14 @@ class ProductTemplate(models.Model):
     kit_free_qty = fields.Float(compute="_compute_kit_available", string="Free To Use Kits", digits="Product Unit of Measure", compute_sudo=False)
     free_qty = fields.Float(compute="_compute_free_qty", string="Free To Use Quantity", digits="Product Unit of Measure", compute_sudo=False)
     is_kit = fields.Boolean(string="Kit?", default=False)
+    ca_condition = fields.Selection([
+        ('NEW', 'New'),
+        ('USED', 'Used'),
+        ('REFURBISHED', 'Refurbished'),
+        ('RECONDITIONED', 'Reconditioned'),
+        ('LIKE NEW', 'Lke New'),
+    ], string="Condition")
+    ca_manufacturer = fields.Char(string="Manufacturer")
 
     @api.depends()
     def _compute_free_qty(self):
@@ -113,10 +121,10 @@ class ProductTemplate(models.Model):
     def update_bundle_price(self):
         for product in self:
             if product.is_kit:
-                component_price = sum([item.product_id.lst_price * item.quantity for item in product.ca_bundle_product_ids])
+                # component_price = sum([item.product_id.lst_price * item.quantity for item in product.ca_bundle_product_ids])
                 component_cost = sum([item.product_id.standard_price * item.quantity for item in product.ca_bundle_product_ids])
                 product.write({
-                    'list_price': component_price,
+                    # 'list_price': component_price,
                     'standard_price': component_cost,
                 })
 
@@ -141,6 +149,15 @@ class ProductTemplate(models.Model):
                     app.call('update_price', product_id=product.ca_product_id, vals=vals)
 
         return res
+
+    def get_ca_attribute(self, attrib=None):
+        self.ensure_one()
+        value = ''
+        if attrib and self.description_sale:
+            attributes = self.description_sale.split('<br>')
+            vals = [attribute.split(':')[-1] for attribute in attributes if attrib in attribute]
+            value = vals and vals[0].strip() or ''
+        return value
 
 
 class ProductProduct(models.Model):
@@ -239,6 +256,15 @@ class ProductProduct(models.Model):
                         vals = {'Cost': product.standard_price}
                         app.call('update_price', product_id=product.ca_product_id, vals=vals)
         return res
+
+    def get_ca_attribute(self, attrib=None):
+        self.ensure_one()
+        value = ''
+        if attrib and self.description_sale:
+            attributes = self.description_sale.split('<br>')
+            vals = [attribute.split(':')[-1] for attribute in attributes if attrib in attribute]
+            value = vals and vals[0].strip() or ''
+        return value
 
 
 class ProductBundle(models.Model):
