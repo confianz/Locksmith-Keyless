@@ -25,51 +25,34 @@
                 </div>
                 <div class="row">
                     <div class="col-12" style="font-weight: 500;">
-                        Manufacturer: &amp;nbsp; <span t-esc="product.ca_brand" />
+                        Manufacturer: &amp;nbsp; <span t-esc="product.ca_manufacturer or ''" />
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-12" style="font-weight: 500;">
-                        Condition: &amp;nbsp; New
+                        Condition: <span t-esc="product.ca_condition or ''" />
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-12" style="font-weight: 500;">
-                        Fcc: &amp;nbsp; GQ43VT20T
+                        Fcc: &amp;nbsp; <span t-esc="product.get_ca_attribute('FCC ID')" />
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-12" style="font-weight: 500;">
-                        Frequency: &amp;nbsp; 315 Mhz
+                        Frequency: &amp;nbsp; <span t-esc="product.get_ca_attribute('Frequency')" />
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-12" style="font-weight: 500;">
-                        Battery: &amp;nbsp; CR2032
+                        Battery: &amp;nbsp; <span t-esc="product.get_ca_attribute('Battery')" />
                     </div>
                 </div>
                 <br />
                 <div class="row">
                     <div class="col-12" style="font-weight: 500;">
-                        FITS:
-                        <table style="width: 100%;">
-                            <tr>
-                                <td>TOYOTA</td>
-                                <td>Highlander</td>
-                                <td>2008-2013</td>
-                            </tr>
-                            <tr>
-                                <td>TOYOTA</td>
-                                <td>Sequoia</td>
-                                <td>2008-2018</td>
-                            </tr>
-                            <tr>
-                                <td>TOYOTA</td>
-                                <td>Sienna</td>
-                                <td>2004-2017</td>
-                            </tr>
-                        </table>
-
+                        FITS: <br />
+                        <t t-raw="product.description" />
                     </div>
                 </div>
                 <div class="row footer">
@@ -83,6 +66,15 @@
                     </div>
                 </div>
             </div>
+        </t>
+    </template>
+
+
+    <template id="report_product_tmpl_label_4x6">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="product">
+                <t t-call="product_label.product_label_4x6_template" />
+            </t>
         </t>
     </template>
 
@@ -117,8 +109,8 @@
         <field name="name">Product Label (4x6)</field>
         <field name="model">product.template</field>
         <field name="report_type">qweb-pdf</field>
-        <field name="report_name">product_label.report_product_label_4x6</field>
-        <field name="report_file">product_label.report_product_label_4x6</field>
+        <field name="report_name">product_label.report_product_tmpl_label_4x6</field>
+        <field name="report_file">product_label.report_product_tmpl_label_4x6</field>
         <field name="print_report_name">'Products Labels - %s' % (object.name)</field>
         <field name="paperformat_id" ref="product_label_paperformat" />
         <field name="binding_model_id" ref="product.model_product_template" />
